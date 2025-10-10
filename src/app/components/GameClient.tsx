@@ -6,64 +6,49 @@ import GuessInput from "./GuessInput";
 import GuessList, { type Guess } from "./GuessList";
 import LastGuessResult from "./LastGuessResult";
 
-interface LawRankInfo {
-  id: number;
-  name: string;
-  score: number;
-  rank: number;
-}
-
-interface DailyGameData {
-  answerId: number;
-  answerName: string;
-  answerContent: string;
-  ranking: LawRankInfo[];
-}
-
 export default function GameClient() {
-  const [gameData, setGameData] = useState<DailyGameData | null>(null);
+  const [answerId, setAnswerId] = useState<number | null>(null);
+  const [gameVersion, setGameVersion] = useState<string | null>(null);
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [lastGuessResult, setLastGuessResult] = useState<Guess | null>(null);
-  const [isFinished, setIsFinished] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [hasWon, setHasWon] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load state from localStorage on initial load
   useEffect(() => {
     const startGame = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        // Check for saved state in localStorage
-        const savedState = localStorage.getItem("lawmantle_gameState");
-        const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const serverRes = await fetch("/api/game");
+        if (!serverRes.ok) {
+          throw new Error("서버에 연결할 수 없습니다.");
+        }
+        const serverData = await serverRes.json();
+        const { answerId: serverAnswerId, gameVersion: serverGameVersion } = serverData;
 
-        if (savedState) {
-          const {
-            date,
-            guesses: savedGuesses,
-            isFinished: savedIsFinished,
-          } = JSON.parse(savedState);
+        const savedStateJSON = localStorage.getItem("lawmantle_gameState");
+        const today = new Date().toISOString().slice(0, 10);
 
-          // If the saved state is for today, load it
-          if (date === today) {
-            setGuesses(savedGuesses);
-            setIsFinished(savedIsFinished);
-          } else {
-            // Otherwise, it's an old state, so remove it
-            localStorage.removeItem("lawmantle_gameState");
+        if (savedStateJSON) {
+          const savedState = JSON.parse(savedStateJSON);
+          if (savedState.date === today && savedState.gameVersion === serverGameVersion) {
+            setGuesses(savedState.guesses);
+            setHasWon(savedState.hasWon || false);
+            setAnswerId(serverAnswerId);
+            setGameVersion(serverGameVersion);
+            return; // Early exit
           }
         }
 
-        // Fetch the pre-calculated static game data
-        const res = await fetch("/daily_game_data.json");
-        if (!res.ok) {
-          throw new Error(
-            "오늘의 게임 데이터를 불러오는 데 실패했습니다. 파이썬 스크립트를 실행했는지 확인하세요."
-          );
-        }
-        const data: DailyGameData = await res.json();
-        setGameData(data);
+        // If we reach here, it's a new day, a new version, or no save. Reset.
+        localStorage.removeItem("lawmantle_gameState");
+        setGuesses([]);
+        setHasWon(false);
+        setAnswerId(serverAnswerId);
+        setGameVersion(serverGameVersion);
+
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
@@ -76,52 +61,67 @@ export default function GameClient() {
     startGame();
   }, []);
 
-  // Save state to localStorage whenever guesses or isFinished change
   useEffect(() => {
-    // Only save after initial loading is complete, to avoid overwriting loaded state
     if (!isLoading) {
       const today = new Date().toISOString().slice(0, 10);
       const gameState = {
         date: today,
         guesses,
-        isFinished,
+        hasWon,
+        answerId,
+        gameVersion,
       };
       localStorage.setItem("lawmantle_gameState", JSON.stringify(gameState));
     }
-  }, [guesses, isFinished, isLoading]);
+  }, [guesses, hasWon, answerId, gameVersion, isLoading]);
 
-  const handleGuess = (guessName: string) => {
-    if (!gameData) return;
+  const handleGuess = async (guessName: string) => {
+    if (!answerId || !gameVersion) return;
 
     setError(null);
 
-    const guessInfo = gameData.ranking.find((law) => law.name === guessName);
+    try {
+      const res = await fetch("/api/game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guess: guessName, answerId, gameVersion }),
+      });
 
-    if (!guessInfo) {
+      const result = await res.json();
+
+      if (!res.ok) {
+        // If the game version is mismatched, reload the page to get the new game state
+        if (res.status === 409) {
+          setError("새로운 게임이 시작되었습니다. 페이지를 새로고침합니다...");
+          setTimeout(() => window.location.reload(), 2000);
+          return;
+        }
+        throw new Error(result.message || "추측을 처리하는 중 오류가 발생했습니다.");
+      }
+
+      const newGuess: Guess = {
+        name: result.name,
+        score: result.score,
+        rank: result.rank,
+        submissionOrder: guesses.length + 1,
+      };
+
+      setLastGuessResult(newGuess);
+
+      if (!guesses.some((g) => g.name === newGuess.name)) {
+        setGuesses((prevGuesses) => [...prevGuesses, newGuess]);
+      }
+
+      if (result.isCorrect) {
+        setHasWon(true);
+      }
+    } catch (err) {
       setError(
-        `'${guessName}' 법률을 찾을 수 없습니다. 자동완성 목록에서 선택해보세요.`
+        err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
       );
-      return;
+    } finally {
+      inputRef.current?.focus();
     }
-
-    const newGuess: Guess = {
-      name: guessInfo.name,
-      score: guessInfo.score,
-      rank: guessInfo.rank,
-      submissionOrder: guesses.length + 1,
-    };
-
-    setLastGuessResult(newGuess);
-
-    if (!guesses.some((g) => g.name === newGuess.name)) {
-      setGuesses((prevGuesses) => [...prevGuesses, newGuess]);
-    }
-
-    if (guessInfo.id === gameData.answerId) {
-      setIsFinished(true);
-    }
-
-    inputRef.current?.focus();
   };
 
   if (isLoading) {
@@ -137,11 +137,11 @@ export default function GameClient() {
         <p className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</p>
       )}
 
-      {isFinished && gameData && (
+      {hasWon && lastGuessResult && (
         <div className="w-full max-w-2xl p-6 mb-8 text-center bg-green-100 border-2 border-green-500 rounded-lg shadow-lg">
           <h2 className="text-3xl font-bold text-green-800">정답입니다! 🎉</h2>
           <p className="text-2xl font-semibold text-gray-800 mt-2">
-            {gameData.answerName}
+            {lastGuessResult.name}
           </p>
           <div className="mt-6">
             <Link
@@ -156,7 +156,7 @@ export default function GameClient() {
 
       <GuessInput
         onSubmit={handleGuess}
-        disabled={!gameData}
+        disabled={isLoading || !answerId}
         inputRef={inputRef}
       />
 
@@ -166,3 +166,4 @@ export default function GameClient() {
     </main>
   );
 }
+

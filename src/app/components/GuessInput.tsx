@@ -72,7 +72,6 @@ export default function GuessInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // IME composition check
       if (e.nativeEvent.isComposing) {
         return;
       }
@@ -83,31 +82,28 @@ export default function GuessInput({
         e.preventDefault();
         setActiveSuggestionIndex((prevIndex) => {
           if (prevIndex === suggestions.length - 1) {
-            return 0; // Wrap to top
+            return 0;
           }
-          return prevIndex + 1; // Go down
+          return prevIndex + 1;
         });
         setShowSuggestions(true);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveSuggestionIndex((prevIndex) => {
           if (prevIndex === -1) {
-            // Not selected yet
-            return suggestions.length - 1; // Wrap to bottom
+            return suggestions.length - 1;
           }
           if (prevIndex === 0) {
-            // Is first item
-            return -1; // Deselect
+            return -1;
           }
-          return prevIndex - 1; // Go up
+          return prevIndex - 1;
         });
         setShowSuggestions(true);
       } else if (e.key === "Enter") {
         if (activeSuggestionIndex !== -1) {
-          e.preventDefault(); // Prevent form submission because we are handling it
+          e.preventDefault();
           selectSuggestion(suggestions[activeSuggestionIndex]);
         }
-        // If no suggestion is selected, do nothing and let the form's onSubmit handle it.
       } else if (e.key === "Escape") {
         setShowSuggestions(false);
         setActiveSuggestionIndex(-1);
@@ -117,7 +113,6 @@ export default function GuessInput({
   );
 
   useEffect(() => {
-    // Reset active suggestion when input changes
     setActiveSuggestionIndex(-1);
   }, [inputValue]);
 
@@ -133,7 +128,7 @@ export default function GuessInput({
             setShowSuggestions(true);
           }}
           onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} // Hide suggestions on blur with a small delay
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder="법률 이름을 입력하세요..."
           disabled={disabled || loadingLaws}
@@ -144,7 +139,7 @@ export default function GuessInput({
             {suggestions.map((suggestion, index) => (
               <li
                 key={index}
-                onMouseDown={() => selectSuggestion(suggestion)} // Use onMouseDown to fire before onBlur
+                onMouseDown={() => selectSuggestion(suggestion)}
                 className={`px-4 py-2 cursor-pointer ${
                   index === activeSuggestionIndex
                     ? "bg-blue-100"

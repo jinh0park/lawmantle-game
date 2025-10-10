@@ -17,13 +17,13 @@ export default function RankingPage() {
   useEffect(() => {
     async function fetchRanking() {
       try {
-        const res = await fetch('/daily_game_data.json');
+        const res = await fetch('/api/ranking');
         if (!res.ok) {
           throw new Error('Failed to fetch ranking data');
         }
-        const data = await res.json();
-        // Assuming the ranking is already sorted and we just need the top 100
-        setRanking(data.ranking.slice(0, 100));
+        const data: LawRankInfo[] = await res.json();
+        // The ranking is already sorted and we just need the top 100
+        setRanking(data.slice(0, 100));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {

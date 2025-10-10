@@ -1,11 +1,12 @@
 
 import { NextResponse } from 'next/server';
+import Redis from 'ioredis';
 
+// Type definitions
 interface Law {
   id: number;
   name: string;
   content: string;
-  embedding?: number[]; // embedding is not in daily_game_data.json
 }
 
 interface LawRankInfo {
@@ -15,73 +16,69 @@ interface LawRankInfo {
   rank: number;
 }
 
-interface DailyGameDataFileContent {
+interface DailyGameData {
+  gameVersion: string; // Added version
   answerId: number;
   answerName: string;
   answerContent: string;
   ranking: LawRankInfo[];
 }
 
-interface DailyGameData {
+interface GameData {
+  gameVersion: string; // Added version
   dailyAnswer: Law;
   dailyRanking: LawRankInfo[];
   totalLaws: number;
 }
 
-// In-memory store for the daily answer and its pre-calculated ranking list.
-let cachedDailyGameData: DailyGameData | null = null;
-let lastSetDate: string | null = null;
+async function getGameDataFromRedis(): Promise<GameData> {
+  const redis = new Redis(process.env.REDIS_URL!);
+  try {
+    const dataString = await redis.get('daily_game_data');
+    if (!dataString) {
+      throw new Error('Daily game data not found in Redis. Cron job may have failed.');
+    }
 
-async function setupDailyGameData(): Promise<DailyGameData> {
-  const today = new Date().toISOString().split('T')[0]; // Get YYYY-MM-DD
-  if (cachedDailyGameData && lastSetDate === today) {
-    return cachedDailyGameData;
+    const data: DailyGameData = JSON.parse(dataString);
+
+    const dailyAnswer: Law = {
+      id: data.answerId,
+      name: data.answerName,
+      content: data.answerContent,
+    };
+
+    const totalLaws = data.ranking.length;
+
+    return { gameVersion: data.gameVersion, dailyAnswer, dailyRanking: data.ranking, totalLaws };
+  } finally {
+    redis.quit();
   }
-
-  // Fetch daily_game_data.json from the public directory
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/daily_game_data.json`);
-  if (!res.ok) {
-    throw new Error('Failed to fetch daily game data');
-  }
-  const data: DailyGameDataFileContent = await res.json();
-
-  const dailyAnswer: Law = {
-    id: data.answerId,
-    name: data.answerName,
-    content: data.answerContent,
-  };
-
-  const dailyRanking: LawRankInfo[] = data.ranking;
-  const totalLaws: number = data.ranking.length;
-
-  cachedDailyGameData = { dailyAnswer, dailyRanking, totalLaws };
-  lastSetDate = today;
-  
-  return cachedDailyGameData;
 }
 
 export async function GET() {
   try {
-    const { dailyAnswer } = await setupDailyGameData();
-    // Only send the ID to the client, not the whole answer object
-    return NextResponse.json({ answerId: dailyAnswer.id });
+    const { dailyAnswer, gameVersion } = await getGameDataFromRedis();
+    // Return version along with answerId
+    return NextResponse.json({ answerId: dailyAnswer.id, gameVersion });
   } catch (error) {
     console.error('Error in GET /api/game:', error);
-    return NextResponse.json({ message: 'Error initializing game' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ message: 'Error initializing game', error: errorMessage }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const { guess, answerId } = await request.json();
+    const { guess, answerId, gameVersion: clientVersion } = await request.json();
 
-    if (typeof guess !== 'string' || typeof answerId !== 'number') {
+    if (typeof guess !== 'string' || typeof answerId !== 'number' || typeof clientVersion !== 'string') {
       return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
     }
 
-    const { dailyAnswer, dailyRanking, totalLaws } = await setupDailyGameData();
+    const { dailyAnswer, dailyRanking, totalLaws, gameVersion: serverVersion } = await getGameDataFromRedis();
 
-    if (answerId !== dailyAnswer.id) {
+    // Validate version first
+    if (clientVersion !== serverVersion) {
       return NextResponse.json({ message: 'Game data mismatch. Please refresh.' }, { status: 409 });
     }
 
@@ -109,6 +106,7 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error in POST /api/game:', error);
-    return NextResponse.json({ message: 'Error processing guess' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ message: 'Error processing guess', error: errorMessage }, { status: 500 });
   }
 }
