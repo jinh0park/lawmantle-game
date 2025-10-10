@@ -18,21 +18,19 @@ function getBarColor(rank: number, total: number): string {
 
 export default function LastGuessResult({ guess }: LastGuessResultProps) {
   const [totalLawsCount, setTotalLawsCount] = useState(0);
-  const [loadingTotalLaws, setLoadingTotalLaws] = useState(true);
 
   useEffect(() => {
     async function fetchTotalLaws() {
       try {
-        const res = await fetch("/daily_game_data.json");
+        const res = await fetch("/law_names.json");
         if (!res.ok) {
-          throw new Error("Failed to fetch daily game data");
+          throw new Error("Failed to fetch law names data");
         }
         const data = await res.json();
-        setTotalLawsCount(data.ranking.length);
+        setTotalLawsCount(data.length);
       } catch (error) {
         console.error("Error fetching total laws:", error);
       } finally {
-        setLoadingTotalLaws(false);
       }
     }
     fetchTotalLaws();
@@ -64,12 +62,9 @@ export default function LastGuessResult({ guess }: LastGuessResultProps) {
           {guess.rank}
         </div>
         <div className="col-span-3 flex items-center">
-          <div
-            className="w-full bg-gray-200 rounded-full h-6"
-            title={`${guess.rank}위`}
-          >
+          <div className="w-full bg-gray-200  h-6" title={`${guess.rank}위`}>
             <div
-              className={`h-6 rounded-full text-xs font-medium text-white flex items-center justify-end pr-2 ${getBarColor(
+              className={`h-6  text-xs font-medium text-white flex items-center justify-end pr-2 ${getBarColor(
                 guess.rank,
                 totalLawsCount
               )}`}

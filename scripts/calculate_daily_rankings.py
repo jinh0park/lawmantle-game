@@ -25,6 +25,8 @@ def main():
     # Construct paths relative to the script's location
     laws_path = os.path.join(script_dir, '../data/laws.json')
     output_path = os.path.join(script_dir, '../public/daily_game_data.json')
+    output_path_law_names = os.path.join(script_dir, '../public/law_names.json')
+    
 
     try:
         with open(laws_path, 'r', encoding='utf-8') as f:
@@ -70,8 +72,14 @@ def main():
     # Save the result to the public directory
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(daily_data, f, ensure_ascii=False, indent=2)
+    
+    # Save the result to the public directory
+    with open(output_path_law_names, 'w', encoding='utf-8') as f:
+        law_names = [law['name'] for law in laws]
+        json.dump(law_names, f, ensure_ascii=False, indent=2)
 
     print(f"Successfully generated daily game data to {output_path}")
+    print(f"Successfully generated law names to {output_path_law_names}")
 
 if __name__ == '__main__':
     main()

@@ -8,13 +8,6 @@ interface GuessInputProps {
   inputRef: RefObject<HTMLInputElement | null>;
 }
 
-interface LawRankInfo {
-  id: number;
-  name: string;
-  score: number;
-  rank: number;
-}
-
 export default function GuessInput({
   onSubmit,
   disabled,
@@ -29,12 +22,12 @@ export default function GuessInput({
   useEffect(() => {
     async function fetchLawNames() {
       try {
-        const res = await fetch("/daily_game_data.json");
+        const res = await fetch("/law_names.json");
         if (!res.ok) {
           throw new Error("Failed to fetch daily game data");
         }
         const data = await res.json();
-        const names = data.ranking.map((law: LawRankInfo) => law.name);
+        const names = data;
         setAvailableLawNames(names);
       } catch (error) {
         console.error("Error fetching law names:", error);
