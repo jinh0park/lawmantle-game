@@ -85,16 +85,14 @@ export async function POST(request: Request) {
     const guessInfo = dailyRanking.find(law => law.name === guess);
 
     if (!guessInfo) {
-      return NextResponse.json({
-        name: guess,
-        score: 0,
-        rank: totalLaws, // If not found, assign the lowest rank
-        isCorrect: false,
-        message: '해당 법률을 찾을 수 없습니다.',
-      });
+      return NextResponse.json(                                                             
+        { message: `'${guess}'에 해당하는 법률을 찾을 수 없습니다.` },
+        { status: 404 }
+      );  
     }
 
     const isCorrect = guessInfo.id === dailyAnswer.id;
+
 
     return NextResponse.json({
       name: guessInfo.name,

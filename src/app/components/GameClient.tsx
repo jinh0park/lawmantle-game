@@ -12,6 +12,9 @@ export default function GameClient() {
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [lastGuessResult, setLastGuessResult] = useState<Guess | null>(null);
   const [hasWon, setHasWon] = useState(false);
+  const [correctAnswerName, setCorrectAnswerName] = useState<string | null>(
+    null
+  ); // State for the correct answer name
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -26,16 +29,18 @@ export default function GameClient() {
           throw new Error("서버에 연결할 수 없습니다.");
         }
         const serverData = await serverRes.json();
-        const { answerId: serverAnswerId, gameVersion: serverGameVersion } = serverData;
+        const { answerId: serverAnswerId, gameVersion: serverGameVersion } =
+          serverData;
 
         const savedStateJSON = localStorage.getItem("lawmantle_gameState");
-        const today = new Date().toISOString().slice(0, 10);
 
         if (savedStateJSON) {
           const savedState = JSON.parse(savedStateJSON);
-          if (savedState.date === today && savedState.gameVersion === serverGameVersion) {
+          // Only compare the game version. This is robust against cron job delays.
+          if (savedState.gameVersion === serverGameVersion) {
             setGuesses(savedState.guesses);
             setHasWon(savedState.hasWon || false);
+            setCorrectAnswerName(savedState.correctAnswerName || null);
             setAnswerId(serverAnswerId);
             setGameVersion(serverGameVersion);
             return; // Early exit
@@ -46,9 +51,9 @@ export default function GameClient() {
         localStorage.removeItem("lawmantle_gameState");
         setGuesses([]);
         setHasWon(false);
+        setCorrectAnswerName(null);
         setAnswerId(serverAnswerId);
         setGameVersion(serverGameVersion);
-
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
@@ -68,12 +73,13 @@ export default function GameClient() {
         date: today,
         guesses,
         hasWon,
+        correctAnswerName, // Save correct answer name
         answerId,
         gameVersion,
       };
       localStorage.setItem("lawmantle_gameState", JSON.stringify(gameState));
     }
-  }, [guesses, hasWon, answerId, gameVersion, isLoading]);
+  }, [guesses, hasWon, correctAnswerName, answerId, gameVersion, isLoading]);
 
   const handleGuess = async (guessName: string) => {
     if (!answerId || !gameVersion) return;
@@ -90,13 +96,14 @@ export default function GameClient() {
       const result = await res.json();
 
       if (!res.ok) {
-        // If the game version is mismatched, reload the page to get the new game state
         if (res.status === 409) {
           setError("새로운 게임이 시작되었습니다. 페이지를 새로고침합니다...");
           setTimeout(() => window.location.reload(), 2000);
           return;
         }
-        throw new Error(result.message || "추측을 처리하는 중 오류가 발생했습니다.");
+        throw new Error(
+          result.message || "추측을 처리하는 중 오류가 발생했습니다."
+        );
       }
 
       const newGuess: Guess = {
@@ -114,6 +121,9 @@ export default function GameClient() {
 
       if (result.isCorrect) {
         setHasWon(true);
+        if (!correctAnswerName) {
+          setCorrectAnswerName(result.name);
+        }
       }
     } catch (err) {
       setError(
@@ -137,11 +147,11 @@ export default function GameClient() {
         <p className="text-red-500 bg-red-100 p-3 rounded-lg mb-4">{error}</p>
       )}
 
-      {hasWon && lastGuessResult && (
+      {hasWon && correctAnswerName && (
         <div className="w-full max-w-2xl p-6 mb-8 text-center bg-green-100 border-2 border-green-500 rounded-lg shadow-lg">
           <h2 className="text-3xl font-bold text-green-800">정답입니다! 🎉</h2>
           <p className="text-2xl font-semibold text-gray-800 mt-2">
-            {lastGuessResult.name}
+            {correctAnswerName}
           </p>
           <div className="mt-6">
             <Link
@@ -166,4 +176,3 @@ export default function GameClient() {
     </main>
   );
 }
-
