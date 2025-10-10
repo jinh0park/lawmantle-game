@@ -60,10 +60,10 @@ export default function LastGuessResult({ guess }: LastGuessResultProps) {
         <div className="col-span-2 text-center text-gray-800">
           {(guess.score * 100).toFixed(2)}
         </div>
-        <div className="col-span-1 text-center text-gray-800 font-semibold">
-          {guess.rank}위
+        <div className="col-span-2 text-center text-gray-800 font-semibold">
+          {guess.rank}
         </div>
-        <div className="col-span-4 flex items-center">
+        <div className="col-span-3 flex items-center">
           <div
             className="w-full bg-gray-200 rounded-full h-6"
             title={`${guess.rank}위`}
