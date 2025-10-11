@@ -21,7 +21,7 @@ export async function GET() {
     
     // --- 2. 데이터 로딩 ---
     // process.cwd()는 프로젝트 루트를 가리킵니다.
-    const lawsPath = path.join(process.cwd(), 'data', 'laws.json');
+    const lawsPath = path.join(process.cwd(), 'public', 'data', 'laws.json');
     const lawsFile = await fs.readFile(lawsPath, 'utf-8');
     const laws: Law[] = JSON.parse(lawsFile);
 
