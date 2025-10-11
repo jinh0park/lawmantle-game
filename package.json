@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "mkdir -p public/data && curl -L -o public/data/laws.json 'https://6dikmf4gqx9huatd.public.blob.vercel-storage.com/laws.json' && next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/blob": "^2.0.0",
     "@vercel/kv": "^3.0.0",
     "ioredis": "^5.8.1",
     "next": "15.5.4",
