@@ -193,14 +193,24 @@ export default function GameClient() {
       {yesterdayData && (
         <div className="mt-12 text-center p-4 border-t-2 border-gray-200 w-full max-w-2xl">
           <p className="text-md text-gray-700">
-            어제의 정답은 <strong>{yesterdayData.answerName}</strong>이었습니다.{" "}
+            ⚖️ 어제의 정답 법률은 <strong>{yesterdayData.answerName}</strong>
+            입니다.{" "}
           </p>
-          <p>
+          <p className="my-4 underline">
             <Link
               href={`/ranking?date=${yesterdayData.date}`}
-              className="text-blue-600 hover:underline font-semibold"
+              className="text-gray-500 hover:underline"
             >
-              어제 답안의 유사도 랭킹 확인하기
+              🥇 어제 답안의 유사도 랭킹 확인하기
+            </Link>
+          </p>
+          <p className="my-4 underline">
+            <Link
+              href={`https://jinh0park.github.io/blog/how-lawmentle-works`}
+              className="text-gray-500 hover:underline"
+              target="_blank"
+            >
+              🧐 로맨틀은 어떻게 작동하나요?
             </Link>
           </p>
         </div>
