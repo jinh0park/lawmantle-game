@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "mkdir -p public/data && curl -L -o public/data/laws.json 'https://6dikmf4gqx9huatd.public.blob.vercel-storage.com/laws.json' && next build",
+    "build": "mkdir -p data && curl -L -o data/laws.json 'https://6dikmf4gqx9huatd.public.blob.vercel-storage.com/laws.json' && next build",
     "start": "next start",
     "lint": "eslint"
   },

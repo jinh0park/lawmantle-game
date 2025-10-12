@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const redis = new Redis(process.env.REDIS_URL!);
 
     // --- 2. 데이터 로딩 ---
-    const lawsPath = path.join(process.cwd(), 'public', 'data', 'laws.json');
+    const lawsPath = path.join(process.cwd(), 'data', 'laws.json');
     const lawsFile = await fs.readFile(lawsPath, 'utf-8');
     const laws: Law[] = JSON.parse(lawsFile);
     const lawsById = new Map(laws.map(law => [law.id.toString(), law]));
