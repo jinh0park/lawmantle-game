@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 import Redis from 'ioredis';
@@ -13,7 +13,14 @@ interface Law {
 }
 
 // Vercel Cron Job은 GET 요청을 보냅니다.
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const cronSecret = request.headers.get('x-vercel-cron-secret');
+  if (cronSecret !== process.env.CRON_SECRET) {
+    return new Response('Unauthorized', {
+      status: 401,
+    });
+  }
+
   try {
     // --- 1. Redis 클라이언트 연결 ---
     const redis = new Redis(process.env.REDIS_URL!);
