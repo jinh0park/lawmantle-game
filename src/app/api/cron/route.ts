@@ -16,59 +16,93 @@ interface Law {
 export async function GET() {
   try {
     // --- 1. Redis 클라이언트 연결 ---
-    // Vercel 환경 변수를 자동으로 읽어옵니다.
     const redis = new Redis(process.env.REDIS_URL!);
     
     // --- 2. 데이터 로딩 ---
-    // process.cwd()는 프로젝트 루트를 가리킵니다.
     const lawsPath = path.join(process.cwd(), 'public', 'data', 'laws.json');
     const lawsFile = await fs.readFile(lawsPath, 'utf-8');
     const laws: Law[] = JSON.parse(lawsFile);
 
-    // --- 3. 계산 로직 ---
-    // 1년 중 몇 번째 날인지 계산
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 0);
-    const diff = now.getTime() - startOfYear.getTime();
-    const oneDay = 1000 * 60 * 60 * 24;
-    const dayOfYear = Math.floor(diff / oneDay);
+    // --- 3. 사용된 정답 ID 목록 불러오기 ---
+    const usedAnswerIdsKey = 'used_answer_ids';
+    let usedAnswerIds = await redis.smembers(usedAnswerIdsKey);
 
-    const answerIndex = (dayOfYear - 1) % laws.length;
-    const answerLaw = laws[answerIndex];
+    // --- 4. 모든 법률이 사용되었는지 확인 및 초기화 ---
+    if (usedAnswerIds.length >= laws.length) {
+      await redis.del(usedAnswerIdsKey);
+      usedAnswerIds = [];
+    }
+    // Redis에서 가져온 ID는 문자열이므로, Set도 문자열 기반으로 작동해야 함
+    const usedAnswerIdsSet = new Set(usedAnswerIds);
 
-    const rankedLaws = laws.map(law => ({
-      id: law.id,
-      name: law.name,
-      score: cosineSimilarity(law.vector, answerLaw.vector),
-    }));
+    // --- 5. 3일치 데이터 계산 및 저장 로직 ---
+    const results = [];
+    for (let i = 0; i < 3; i++) {
+      // 한국 시간(KST, UTC+9) 기준으로 날짜 계산
+      const now = new Date();
+      now.setHours(now.getHours() + 9); // KST로 변경
+      now.setDate(now.getDate() + i);   // 0, 1, 2일 후
+      
+      const year = now.getUTCFullYear();
+      const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = now.getUTCDate().toString().padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
 
-    // 점수 기준으로 내림차순 정렬
-    rankedLaws.sort((a, b) => b.score - a.score);
-    
-    const finalRanking = rankedLaws.map((law, index) => ({
-      ...law,
-      rank: index + 1,
-    }));
+      // --- 5-1. 새로운 랜덤 정답 선택 ---
+      let answerLaw: Law;
+      let attempts = 0;
+      const maxAttempts = laws.length * 2; // 무한 루프 방지
 
-    const dailyData = {
-      gameVersion: new Date().getTime().toString(), // Add a version identifier
-      answerId: answerLaw.id,
-      answerName: answerLaw.name,
-      answerContent: answerLaw.content,
-      ranking: finalRanking,
-    };
+      do {
+        const randomIndex = Math.floor(Math.random() * laws.length);
+        answerLaw = laws[randomIndex];
+        attempts++;
+        if (attempts > maxAttempts) {
+          console.warn('Could not find an unused law. Using the last random one.');
+          break;
+        }
+      } while (usedAnswerIdsSet.has(answerLaw!.id.toString()));
 
-    // --- 4. Redis에 결과 저장 ---
-    // set 명령어는 보통 2개의 인자만 받으므로, JSON 문자열로 저장합니다.
-    await redis.set('daily_game_data', JSON.stringify(dailyData));
+      // --- 5-2. 사용된 정답 목록에 새 ID 추가 (메모리 및 Redis) ---
+      usedAnswerIdsSet.add(answerLaw.id.toString());
+      await redis.sadd(usedAnswerIdsKey, answerLaw.id.toString());
+
+      // --- 5-3. 유사도 계산 및 랭킹 생성 ---
+      const rankedLaws = laws.map(law => ({
+        id: law.id,
+        name: law.name,
+        score: cosineSimilarity(law.vector, answerLaw.vector),
+      }));
+
+      rankedLaws.sort((a, b) => b.score - a.score);
+      
+      const finalRanking = rankedLaws.map((law, index) => ({
+        ...law,
+        rank: index + 1,
+      }));
+
+      const dailyData = {
+        gameVersion: new Date(dateString).getTime().toString(),
+        answerId: answerLaw.id,
+        answerName: answerLaw.name,
+        answerContent: answerLaw.content,
+        ranking: finalRanking,
+      };
+
+      // --- 5-4. Redis에 일일 데이터 저장 ---
+      const redisKey = `daily_game_data:${dateString}`;
+      await redis.set(redisKey, JSON.stringify(dailyData));
+      results.push(`Successfully updated ${redisKey}`);
+    }
     
     // 연결 종료
     redis.quit();
 
-    // --- 5. 성공 응답 ---
+    // --- 6. 성공 응답 ---
     return NextResponse.json({
       status: 'success',
-      message: 'Daily game data successfully updated in Redis.',
+      message: 'Daily game data for the next 3 days updated with random answers.',
+      details: results,
     });
 
   } catch (error) {
