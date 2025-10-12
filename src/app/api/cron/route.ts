@@ -18,13 +18,15 @@ export async function GET(request: NextRequest) {
 
   const cronSecretFromHeader = request.headers.get('x-vercel-cron-secret');
   const cronSecretFromEnv = process.env.CRON_SECRET;
+  const authHeader = request.headers.get('Authorization');
 
   // --- 디버깅을 위한 로그 추가 ---
   console.log('Secret from Header:', cronSecretFromHeader);
   console.log('Secret from Environment:', cronSecretFromEnv);
   console.log('Do they match?', cronSecretFromHeader === cronSecretFromEnv);
+  console.log('Auth Header:', authHeader);
   // --- 디버깅 로그 끝 ---
-  
+
   if (cronSecret !== process.env.CRON_SECRET) {
     return new Response('Unauthorized', {
       status: 401,
