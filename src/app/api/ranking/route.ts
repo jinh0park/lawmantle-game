@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Redis from 'ioredis';
 
 interface LawRankInfo {
@@ -9,29 +9,50 @@ interface LawRankInfo {
 }
 
 interface DailyGameData {
+  answerName: string;
   ranking: LawRankInfo[];
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const redis = new Redis(process.env.REDIS_URL!);
   try {
-    // 한국 시간(KST, UTC+9) 기준으로 현재 날짜 문자열 생성
-    const now = new Date();
-    now.setHours(now.getHours() + 9); // KST로 변경
-    const year = now.getUTCFullYear();
-    const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = now.getUTCDate().toString().padStart(2, '0');
-    const dateString = `${year}-${month}-${day}`;
+    const searchParams = request.nextUrl.searchParams;
+    const dateParam = searchParams.get('date');
+
+    let dateString: string;
+
+    if (dateParam) {
+      // Basic validation for YYYY-MM-DD format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        return NextResponse.json({ message: 'Invalid date format. Use YYYY-MM-DD.' }, { status: 400 });
+      }
+      dateString = dateParam;
+    } else {
+      // Default to today KST
+      const now = new Date();
+      now.setHours(now.getHours() + 9); // KST로 변경
+      const year = now.getUTCFullYear();
+      const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = now.getUTCDate().toString().padStart(2, '0');
+      dateString = `${year}-${month}-${day}`;
+    }
+    
     const redisKey = `daily_game_data:${dateString}`;
 
     const dataString = await redis.get(redisKey);
     if (!dataString) {
-      throw new Error(`Daily ranking data for ${dateString} not found in Redis. Cron job may have failed.`);
+      return NextResponse.json(
+        { message: `Ranking data for ${dateString} not found.` },
+        { status: 404 }
+      );
     }
 
     const data: DailyGameData = JSON.parse(dataString);
 
-    return NextResponse.json(data.ranking);
+    return NextResponse.json({
+      answerName: data.answerName,
+      ranking: data.ranking,
+    });
 
   } catch (error) {
     console.error('Error in GET /api/ranking:', error);

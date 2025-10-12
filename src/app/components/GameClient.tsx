@@ -15,6 +15,10 @@ export default function GameClient() {
   const [correctAnswerName, setCorrectAnswerName] = useState<string | null>(
     null
   ); // State for the correct answer name
+  const [yesterdayData, setYesterdayData] = useState<{
+    answerName: string;
+    date: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -24,10 +28,22 @@ export default function GameClient() {
       setIsLoading(true);
       setError(null);
       try {
-        const serverRes = await fetch("/api/game");
+        // Fetch today's game data and yesterday's answer in parallel
+        const [serverRes, yesterdayRes] = await Promise.all([
+          fetch("/api/game"),
+          fetch("/api/yesterday-answer"),
+        ]);
+
         if (!serverRes.ok) {
           throw new Error("서버에 연결할 수 없습니다.");
         }
+        if (yesterdayRes.ok) {
+          const yesterdayJson = await yesterdayRes.json();
+          if (yesterdayJson.answerName) {
+            setYesterdayData(yesterdayJson);
+          }
+        }
+
         const serverData = await serverRes.json();
         const { answerId: serverAnswerId, gameVersion: serverGameVersion } =
           serverData;
@@ -173,6 +189,22 @@ export default function GameClient() {
       {lastGuessResult && <LastGuessResult guess={lastGuessResult} />}
 
       <GuessList guesses={guesses} />
+
+      {yesterdayData && (
+        <div className="mt-12 text-center p-4 border-t-2 border-gray-200 w-full max-w-2xl">
+          <p className="text-md text-gray-700">
+            어제의 정답은 <strong>{yesterdayData.answerName}</strong>이었습니다.{" "}
+          </p>
+          <p>
+            <Link
+              href={`/ranking?date=${yesterdayData.date}`}
+              className="text-blue-600 hover:underline font-semibold"
+            >
+              어제 답안의 유사도 랭킹 확인하기
+            </Link>
+          </p>
+        </div>
+      )}
     </main>
   );
 }

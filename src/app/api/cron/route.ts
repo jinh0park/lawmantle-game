@@ -14,16 +14,37 @@ interface Law {
 
 // Vercel Cron Job은 GET 요청을 보냅니다.
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
- if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response('Unauthorized', {
-      status: 401,
-    });
+  // In production, Vercel's cron job sends a secret token. We validate it.
+  // In development, we bypass this check for easier testing.
+  if (process.env.NODE_ENV === 'production') {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new Response('Unauthorized', {
+        status: 401,
+      });
+    }
   }
 
   try {
     // --- 1. Redis 클라이언트 연결 ---
     const redis = new Redis(process.env.REDIS_URL!);
+
+    // --- NEW: 3일 이상 지난 데이터 삭제 ---
+    const oldDataDate = new Date();
+    oldDataDate.setHours(oldDataDate.getHours() + 9); // KST로 변경
+    oldDataDate.setDate(oldDataDate.getDate() - 4); // 4일 전 데이터 삭제
+
+    const oldYear = oldDataDate.getUTCFullYear();
+    const oldMonth = (oldDataDate.getUTCMonth() + 1).toString().padStart(2, '0');
+    const oldDay = oldDataDate.getUTCDate().toString().padStart(2, '0');
+    const oldDateString = `${oldYear}-${oldMonth}-${oldDay}`;
+
+    const oldRedisKey = `daily_game_data:${oldDateString}`;
+    const deletedCount = await redis.del(oldRedisKey);
+
+    if (deletedCount > 0) {
+      console.log(`Deleted old game data: ${oldRedisKey}`);
+    }
 
     // --- 2. 데이터 로딩 ---
     const lawsPath = path.join(process.cwd(), 'data', 'laws.json');
