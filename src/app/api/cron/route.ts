@@ -24,28 +24,44 @@ export async function GET(request: NextRequest) {
   try {
     // --- 1. Redis 클라이언트 연결 ---
     const redis = new Redis(process.env.REDIS_URL!);
-    
+
     // --- 2. 데이터 로딩 ---
     const lawsPath = path.join(process.cwd(), 'public', 'data', 'laws.json');
     const lawsFile = await fs.readFile(lawsPath, 'utf-8');
     const laws: Law[] = JSON.parse(lawsFile);
+    const lawsById = new Map(laws.map(law => [law.id.toString(), law]));
 
-    // --- 3. 사용된 정답 ID 목록 불러오기 ---
-    const usedAnswerIdsKey = 'used_answer_ids';
-    let usedAnswerIds = await redis.smembers(usedAnswerIdsKey);
+    // --- 3. 정답 스케줄 관리 --- 
+    const scheduleKey = 'answer_schedule';
+    const scheduleExists = await redis.exists(scheduleKey);
 
-    // --- 4. 모든 법률이 사용되었는지 확인 및 초기화 ---
-    if (usedAnswerIds.length >= laws.length) {
-      await redis.del(usedAnswerIdsKey);
-      usedAnswerIds = [];
+    if (!scheduleExists) {
+      console.log('Answer schedule not found. Generating a new one...');
+      const allLawIds = laws.map(law => law.id.toString());
+
+      // Fisher-Yates shuffle
+      for (let j = allLawIds.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [allLawIds[j], allLawIds[k]] = [allLawIds[k], allLawIds[j]];
+      }
+
+      const startDate = new Date('2025-10-10T00:00:00Z');
+      const schedule: { [key: string]: string } = {};
+      allLawIds.forEach((id, index) => {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + index);
+        const dateString = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        schedule[dateString] = id;
+      });
+
+      await redis.hset(scheduleKey, schedule);
+      console.log(`New schedule generated for ${allLawIds.length} days.`);
     }
-    // Redis에서 가져온 ID는 문자열이므로, Set도 문자열 기반으로 작동해야 함
-    const usedAnswerIdsSet = new Set(usedAnswerIds);
 
-    // --- 5. 3일치 데이터 계산 및 저장 로직 ---
+    // --- 4. 3일치 데이터 계산 및 저장 로직 ---
     const results = [];
     for (let i = 0; i < 3; i++) {
-      // 한국 시간(KST, UTC+9) 기준으로 날짜 계산
+      // --- 4-1. 날짜 계산 (KST 기준) ---
       const now = new Date();
       now.setHours(now.getHours() + 9); // KST로 변경
       now.setDate(now.getDate() + i);   // 0, 1, 2일 후
@@ -55,26 +71,21 @@ export async function GET(request: NextRequest) {
       const day = now.getUTCDate().toString().padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
-      // --- 5-1. 새로운 랜덤 정답 선택 ---
-      let answerLaw: Law;
-      let attempts = 0;
-      const maxAttempts = laws.length * 2; // 무한 루프 방지
+      // --- 4-2. 스케줄에서 정답 ID 가져오기 ---
+      const answerId = await redis.hget(scheduleKey, dateString);
 
-      do {
-        const randomIndex = Math.floor(Math.random() * laws.length);
-        answerLaw = laws[randomIndex];
-        attempts++;
-        if (attempts > maxAttempts) {
-          console.warn('Could not find an unused law. Using the last random one.');
-          break;
-        }
-      } while (usedAnswerIdsSet.has(answerLaw!.id.toString()));
+      if (!answerId) {
+        // 스케줄이 끝났을 경우에 대한 처리 (예: 재 생성 알림)
+        // 여기서는 간단히 에러를 던지지만, 실제로는 스케줄을 확장하는 로직이 필요할 수 있음
+        throw new Error(`Answer for date ${dateString} not found in schedule. The schedule might be exhausted.`);
+      }
 
-      // --- 5-2. 사용된 정답 목록에 새 ID 추가 (메모리 및 Redis) ---
-      usedAnswerIdsSet.add(answerLaw.id.toString());
-      await redis.sadd(usedAnswerIdsKey, answerLaw.id.toString());
+      const answerLaw = lawsById.get(answerId);
+      if (!answerLaw) {
+        throw new Error(`Law with ID ${answerId} (for date ${dateString}) not found.`);
+      }
 
-      // --- 5-3. 유사도 계산 및 랭킹 생성 ---
+      // --- 4-3. 유사도 계산 및 랭킹 생성 ---
       const rankedLaws = laws.map(law => ({
         id: law.id,
         name: law.name,
@@ -96,7 +107,7 @@ export async function GET(request: NextRequest) {
         ranking: finalRanking,
       };
 
-      // --- 5-4. Redis에 일일 데이터 저장 ---
+      // --- 4-4. Redis에 일일 데이터 저장 ---
       const redisKey = `daily_game_data:${dateString}`;
       await redis.set(redisKey, JSON.stringify(dailyData));
       results.push(`Successfully updated ${redisKey}`);
@@ -105,10 +116,10 @@ export async function GET(request: NextRequest) {
     // 연결 종료
     redis.quit();
 
-    // --- 6. 성공 응답 ---
+    // --- 5. 성공 응답 ---
     return NextResponse.json({
       status: 'success',
-      message: 'Daily game data for the next 3 days updated with random answers.',
+      message: `Daily game data for the next 3 days updated using the answer schedule.`,
       details: results,
     });
 
