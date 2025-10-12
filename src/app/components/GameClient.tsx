@@ -206,7 +206,7 @@ export default function GameClient() {
           </p>
           <p className="my-4 underline">
             <Link
-              href={`https://jinh0park.github.io/blog/how-lawmentle-works`}
+              href={`https://jinh0park.github.io/blog/how-lawmantle-works`}
               className="text-gray-500 hover:underline"
               target="_blank"
             >
