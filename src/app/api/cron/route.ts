@@ -15,6 +15,16 @@ interface Law {
 // Vercel Cron Job은 GET 요청을 보냅니다.
 export async function GET(request: NextRequest) {
   const cronSecret = request.headers.get('x-vercel-cron-secret');
+
+  const cronSecretFromHeader = request.headers.get('x-vercel-cron-secret');
+  const cronSecretFromEnv = process.env.CRON_SECRET;
+
+  // --- 디버깅을 위한 로그 추가 ---
+  console.log('Secret from Header:', cronSecretFromHeader);
+  console.log('Secret from Environment:', cronSecretFromEnv);
+  console.log('Do they match?', cronSecretFromHeader === cronSecretFromEnv);
+  // --- 디버깅 로그 끝 ---
+  
   if (cronSecret !== process.env.CRON_SECRET) {
     return new Response('Unauthorized', {
       status: 401,
