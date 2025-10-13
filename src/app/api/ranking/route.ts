@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const dateParam = searchParams.get('date');
 
+    const now = new Date();
+    now.setHours(now.getHours() + 9); // KST로 변경
+    const today = new Date(now.toISOString().split('T')[0]);
+
     let dateString: string;
 
     if (dateParam) {
@@ -26,15 +30,14 @@ export async function GET(request: NextRequest) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
         return NextResponse.json({ message: 'Invalid date format. Use YYYY-MM-DD.' }, { status: 400 });
       }
+      const requestedDate = new Date(dateParam);
+      if (requestedDate > today) {
+        return NextResponse.json({ message: "Cannot retrieve rankings for a future date." }, { status: 403 });
+      }
       dateString = dateParam;
     } else {
       // Default to today KST
-      const now = new Date();
-      now.setHours(now.getHours() + 9); // KST로 변경
-      const year = now.getUTCFullYear();
-      const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-      const day = now.getUTCDate().toString().padStart(2, '0');
-      dateString = `${year}-${month}-${day}`;
+      dateString = today.toISOString().split('T')[0];
     }
     
     const redisKey = `daily_game_data:${dateString}`;
