@@ -211,22 +211,33 @@ export default function GameClient() {
           <p className="my-4 underline">
             <Link
               href={`/ranking?date=${yesterdayData.date}`}
-              className="text-gray-500 hover:underline"
+              className="text-gray-500 hover:underline hover:text-gray-400"
             >
               🥇 어제 답안의 유사도 랭킹 확인하기
             </Link>
           </p>
-          <p className="my-4 underline">
-            <Link
-              href={`https://jinh0park.github.io/blog/how-lawmantle-works`}
-              className="text-gray-500 hover:underline"
-              target="_blank"
-            >
-              🧐 로맨틀은 어떻게 작동하나요?
-            </Link>
-          </p>
         </div>
       )}
+      <p className="text-md text-gray-700">
+        💡 로맨틀은{" "}
+        <Link
+          href={"https://semantle-ko.newsjel.ly/"}
+          className="text-gray-500 underline hover:text-gray-400"
+          target="_blank"
+        >
+          꼬맨틀
+        </Link>
+        의 법률 버전 게임입니다.
+      </p>
+      <p className="my-4 underline">
+        <Link
+          href={`https://jinh0park.github.io/blog/how-lawmantle-works`}
+          className="text-gray-500 hover:underline hover:text-gray-400"
+          target="_blank"
+        >
+          🧐 로맨틀은 어떻게 작동하나요?
+        </Link>
+      </p>
     </main>
   );
 }
