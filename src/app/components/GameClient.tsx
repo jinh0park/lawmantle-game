@@ -166,8 +166,20 @@ export default function GameClient() {
       {hasWon && correctAnswerName && (
         <div className="w-full max-w-2xl p-6 mb-8 text-center bg-green-100 border-2 border-green-500 rounded-lg shadow-lg">
           <h2 className="text-3xl font-bold text-green-800">정답입니다! 🎉</h2>
-          <p className="text-2xl font-semibold text-gray-800 mt-2">
-            {correctAnswerName}
+          <p className="text-lg font-semibold text-gray-800 mt-2 flex items-center justify-center gap-2">
+            <span>{correctAnswerName}</span>
+            <a
+              href={`https://casenote.kr/%EB%B2%95%EB%A0%B9/${correctAnswerName.replace(
+                / /g,
+                "_"
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`${correctAnswerName} 법령 정보 보기`}
+              className="hover:opacity-75 transition-opacity"
+            >
+              🔗
+            </a>
           </p>
           <div className="mt-6">
             <Link
