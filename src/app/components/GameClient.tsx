@@ -206,6 +206,9 @@ export default function GameClient() {
       {yesterdayData && (
         <div className="mt-12 text-center p-4 border-t-2 border-gray-200 w-full max-w-2xl">
           <p className="text-md text-gray-700">
+            🌎 정답 법률은 매일 자정(한국 시간)에 변경됩니다.
+          </p>
+          <p className="my-4 text-md text-gray-700">
             ⚖️ 어제의 정답 법률은 <strong>{yesterdayData.answerName}</strong>
             입니다.{" "}
           </p>
