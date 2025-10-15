@@ -173,6 +173,7 @@ export default function GameClient() {
                 / /g,
                 "_"
               )}`}
+              // TODO: replace ㆍ to · in URL if needed
               target="_blank"
               rel="noopener noreferrer"
               title={`${correctAnswerName} 법령 정보 보기`}
@@ -186,7 +187,7 @@ export default function GameClient() {
               href="/ranking"
               className="px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200"
             >
-              유사도 상위 100단어 보기
+              유사도 상위 100 법률 보기
             </Link>
           </div>
         </div>

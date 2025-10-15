@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /ranking
+
+Sitemap: https://lawmantle.vercel.app/sitemap.xml

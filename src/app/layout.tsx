@@ -13,9 +13,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// <meta name="google-site-verification" content="bdNuUzF3wXs062CXhjZra4tRAnyOUNfFS2_BHwqSVVg" />
+
 export const metadata: Metadata = {
   title: "로맨틀 - 법률 유사도 추측 게임",
   description: "유사도를 통해 오늘의 법률을 추측해보세요!",
+  verification: { google: "bdNuUzF3wXs062CXhjZra4tRAnyOUNfFS2_BHwqSVVg" },
+  openGraph: {
+    title: "로맨틀 - 법률 유사도 추측 게임",
+    description: "유사도를 통해 오늘의 법률을 추측해보세요!",
+    url: "https://lawmantle.vercel.app",
+    siteName: "로맨틀",
+    locale: "ko_KR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
